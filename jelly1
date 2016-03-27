@@ -1,0 +1,105 @@
+'''
+
+Program has been written using OPENCV 3.0
+
+
+*In this the laplacian transform of image is taken.
+*Then the image is flooded that is inner part of boundaries found is filled with white.
+*Noisy image is there and also some extra part comes after flooding image
+*Therefore morphological open is used
+
+*This the required image
+*Now contours are found for this image
+*Very small areas are avoided (it could be noise.Can't say with sure anything.Also to avoid zero division of moments)
+*Using moments centroid coordinates are found.
+*point sized circle is drawn at the point of centoid
+
+
+** The problem**
+In some regions two jellyfishes keeps contact so region detected is for two or more  jellyfishes
+In that cases the centroid is not at center and in between the two jellyfishes
+
+
+**Note:- The findcontours syntax is different for opencv2.4.9
+
+
+#######################################################################################################################################
+'''
+
+
+
+
+import numpy as np
+import cv2
+
+
+##############image reading###############################
+
+img = cv2.imread('jellyfish.jpg')
+
+##########################################################
+
+
+#############image processing##############################
+
+
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)                     #grayscale of jellyfish
+image = cv2.Laplacian(gray,-1/cv2.CV_16S)                       #laplacian of image 
+
+
+th, im_th = cv2.threshold(image,25, 255, cv2.THRESH_BINARY)     #image thresholding
+
+#cv2.imshow('im_th2',im_th)
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))    #dilating the image  
+im_th = cv2.dilate(im_th, kernel, iterations = 1)
+#cv2.imshow('opened',im_th)
+
+
+#######flooding the image#################
+ 
+im_floodfill = im_th.copy()                                      ##copy of image im_th
+h, w = im_th.shape[:2]
+
+mask = np.zeros((h+2, w+2), np.uint8)                            #masking
+cv2.floodFill(im_floodfill, mask, (3,3),255)                     #flooding im_floodfill
+
+im_floodfill = cv2.erode(im_floodfill, kernel, iterations = 2)   #making it slightly dark  
+im_floodfill_inv = cv2.bitwise_not(im_floodfill)                 #inverse of image ,so black background again
+im_out = im_th | im_floodfill_inv                                #or with original image
+############################################################
+
+
+im_out = cv2.morphologyEx(im_out, cv2.MORPH_OPEN, kernel,iterations=5)   #opening the image to reduce noise.
+
+#cv2.imshow('fin',im_out)
+
+###############finding contours#####################################
+
+eve,contours, hierarchy = cv2.findContours(im_out,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)  #IMPORTANT NOTE:- THIS COMMAND IS FOR OPENCV 3.0 ,for 2.4.9 there are 2 outputs only
+print len(contours)
+
+count=0
+i=0
+while (i<len(contours)):
+    Area = cv2.contourArea(contours[i])
+    Per =  cv2.arcLength(contours[i],True)
+    M = cv2.moments(contours[i])
+    if (Area > 5) & (Per > 5):
+        cx = int(M['m10']/M['m00'])
+        cy = int(M['m01']/M['m00'])
+        cv2.circle(img,(cx,cy), 5, (0,0,255), -1)
+        
+    i=i+1
+
+#########################################################################
+
+    
+
+    
+#####################image output########################################
+cv2.imshow('output3',img)
+
+#########################################################################
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()

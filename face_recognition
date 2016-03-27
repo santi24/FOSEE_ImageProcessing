@@ -1,0 +1,132 @@
+
+'''
+Program written in opencv3.0
+Below is the program for face detection .
+* 4 important things that must be in same file.
+1.oscarSelfie image
+2.haarcascade_frontalface_default.xml
+3.haarcascade_eye.xml
+4.haarcascade_righteye_2splits.xml
+
+Algorithm followed:-
+
+*First the given image is sharpened with the help of laplacian transform.
+*Then the faces are found using haar's facial cascades.
+*Then ellen's eye's are found using haar's eye cascades.
+*Then RGB values are found of centroid of the square made around her eyes.
+*using eye cascades those eyes are detected which are not in  the boundary of faces(i.e. eyes out of blue boxes)
+*this means that there may be human faces which were not detected(Half faces or dark faces)
+*considering these eyes a roughly face detection is found(red boxes)
+*Output:- Blue boxes(100% sure human faces) green boxes(ellen's eyes) red boxes(May be human's face as eyes detected)
+         
+####################################################################################################################################
+'''
+
+
+import numpy as np
+import cv2
+
+##############haar cascades for face and eyes declared#################
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
+eye_cascade2 = cv2.CascadeClassifier('haarcascade_righteye_2splits.xml')
+################################################################################
+
+
+
+####image reading#########    
+img = cv2.imread('oscarSelfie.jpg')
+####################################
+
+
+
+#####image processing###############################
+
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))      #kernel
+image = cv2.Laplacian(img,-1/cv2.CV_16S)                          #laplacian of image 
+image2 = cv2.dilate(image,kernel,iterations = 1)                  #dilating laplacian image to whiten the boundary
+
+#cv2.imshow('imag',image2)
+gray = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)                   #gray scale of laplacian image 
+gray2 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)                     #gray scale of oscarselfie 
+#cv2.imshow('imag1',gray)
+#cv2.imshow('imag2',gray2)
+gray3 = cv2.bitwise_and(~gray,gray2)                              #and operation of inverted laplacian i.e black foreground and white background with oscarselfie gray image
+
+#cv2.imshow('imag3',gray3)
+grayf = cv2.erode(gray3,kernel,iterations = 1)                    #eroding this gray image
+faces = face_cascade.detectMultiScale(grayf, 1.3, 4,cv2.CASCADE_SCALE_IMAGE,(20,20))  #face detection using haar cascades
+
+############making squares around the detected faces
+
+for (x,y,w,h) in faces:
+    if(x > 300 & x < 340):
+        if(y>200 & y<250):
+            coor_x = x
+            coor_y = y
+            coor_w= w
+    cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)
+    
+############ ellen's face coordinates .This is our region of interest for finding the eyes.
+
+ellen_gray = gray2[coor_y:coor_y+coor_w, coor_x:coor_x+coor_w]
+ellen_color = img[coor_y:coor_y+coor_w, coor_x:coor_x+coor_w]
+
+############# ellen's eye detection using cascades
+eyes = eye_cascade.detectMultiScale(ellen_gray)
+for (ex,ey,ew,eh) in eyes:
+            cv2.rectangle(ellen_color,(ex,ey),(ex+ew,ey+eh),(0,255,0),2)
+            
+#############  centroid of her eyes
+            
+centroid_x = ex + ew/2
+centroid_y = ey + eh/2
+
+############# RGB value of centroid.
+blue_val = img[centroid_x][centroid_y][0]
+green_val = img[centroid_x][centroid_y][1]
+red_val = img[centroid_x][centroid_y][2]
+
+print  red_val ,  green_val , blue_val
+
+
+'''
+############# Next Task######################################
+*probably there may be more faces but are not detected
+*We can detect all eyes in the image
+*So find those eyes which are not inside the faces detected
+*These may be human
+*Roughly make red squares which tell that these may be human
+#############################################################
+'''
+
+
+################finding faces from eyes
+
+flag=0
+i=0
+eyes2 = eye_cascade2.detectMultiScale(gray2)
+for (ex,ey,ew,eh) in eyes2:
+    flag=0
+    for (x,y,w,h) in faces:
+        if (ex >x) & (ex<(x+w)):
+            if (ey > y) & (ey <(y+h)):
+                flag=1
+               
+    if(flag==0): 
+         cv2.rectangle(img,(ex,ey),(ex+100,ey+100),(0,0,255),2)
+        
+
+#considering ex,ey as centroid of face approximately we have drawn faces.
+
+         
+####################################################################################################################
+
+
+########## Image output####################################################################################         
+cv2.imshow('img',img)
+##############################################
+
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
